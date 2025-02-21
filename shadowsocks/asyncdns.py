@@ -450,7 +450,7 @@ class DNSResolver(object):
                           hostname, qtype, server)
             self._sock.sendto(req, server)
 
-    def resolve(self, hostname, callback):
+    def resolve(self, hostname, callback, support_ipv6 = True):
         if type(hostname) != bytes:
             hostname = hostname.encode('utf8')
         if not hostname:
@@ -480,7 +480,7 @@ class DNSResolver(object):
                     return
             arr = self._hostname_to_cb.get(hostname, None)
             if not arr:
-                if IPV6_CONNECTION_SUPPORT:
+                if IPV6_CONNECTION_SUPPORT and support_ipv6:
                     self._hostname_status[hostname] = STATUS_IPV6
                     self._send_req(hostname, QTYPE_AAAA)
                 else:
@@ -491,7 +491,7 @@ class DNSResolver(object):
             else:
                 arr.append(callback)
                 # TODO send again only if waited too long
-                if IPV6_CONNECTION_SUPPORT:
+                if IPV6_CONNECTION_SUPPORT and support_ipv6:
                     self._send_req(hostname, QTYPE_AAAA)
                 else:
                     self._send_req(hostname, QTYPE_A)
