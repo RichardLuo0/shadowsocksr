@@ -32,6 +32,9 @@ import threading
 from shadowsocks import encrypt, obfs, eventloop, shell, common, lru_cache, version
 from shadowsocks.common import pre_parse_header, parse_header
 
+# import socks
+from functools import partial
+
 # we clear at most TIMEOUTS_CLEAN_SIZE timeouts each time
 TIMEOUTS_CLEAN_SIZE = 512
 
@@ -94,6 +97,17 @@ NETWORK_MTU = 1500
 TCP_MSS = NETWORK_MTU - 40
 BUF_SIZE = 32 * 1024
 UDP_MAX_BUF_SIZE = 65536
+
+# PROXY_WEBSITE = ["netflix.com", "openai.com", "cloudflare.com"]
+PROXY_WEBSITE = [
+  # TVB
+  "tvb.com", "tvbanywhere.com", "tvbanywhere.com.sg", "omtrdc.net",
+  # Tubi TV
+  "tubitv.com", "tubi.io",
+  # pdf-xchange
+  "pdf-xchange.com",
+]
+# socks.set_default_proxy(socks.SOCKS5, "127.0.0.1", 40000) # warp
 
 class SpeedTester(object):
     def __init__(self, max_speed = 0):
@@ -667,8 +681,11 @@ class TCPRelayHandler(object):
                 if len(data) > header_length:
                     self._data_to_write_to_remote.append(data[header_length:])
                 # notice here may go into _handle_dns_resolved directly
+                addr_len = len(remote_addr)
+                need_proxy = any(remote_addr.endswith(s) and (addr_len <= len(s) or remote_addr[-len(s) - 1] == ".") for s in PROXY_WEBSITE)
                 self._dns_resolver.resolve(remote_addr,
-                                           self._handle_dns_resolved)
+                                           partial(self._handle_dns_resolved, need_proxy = need_proxy),
+                                           not need_proxy)
         except Exception as e:
             self._log_error(e)
             if self._config['verbose']:
@@ -696,7 +713,7 @@ class TCPRelayHandler(object):
                 except Exception as e:
                     logging.warn("bind %s fail" % (bind_addr,))
 
-    def _create_remote_socket(self, ip, port):
+    def _create_remote_socket(self, ip, port, need_proxy = False):
         if self._remote_udp:
             addrs_v6 = socket.getaddrinfo("::", 0, 0, socket.SOCK_DGRAM, socket.SOL_UDP)
             addrs = socket.getaddrinfo("0.0.0.0", 0, 0, socket.SOCK_DGRAM, socket.SOL_UDP)
@@ -719,6 +736,8 @@ class TCPRelayHandler(object):
                         raise Exception('Port %d is in forbidden list, when connect to %s:%d via port %d by UID %d' %
                             (sa[1], self._remote_address[0], self._remote_address[1], self._server._listen_port, self._user_id))
                     raise Exception('Port %d is in forbidden list, reject' % sa[1])
+        af = socket.AF_INET if need_proxy else af
+        # remote_sock = socks.socksocket(af, socktype, proto) if need_proxy else socket.socket(af, socktype, proto)
         remote_sock = socket.socket(af, socktype, proto)
         self._remote_sock = remote_sock
         self._remote_sock_fd = remote_sock.fileno()
@@ -741,10 +760,13 @@ class TCPRelayHandler(object):
         else:
             remote_sock.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
             if not self._is_local:
-                self._socket_bind_addr(remote_sock, af)
+                if need_proxy:
+                  remote_sock.setsockopt(socket.SOL_SOCKET, 25, "tun0")
+                else:
+                  self._socket_bind_addr(remote_sock, af)
         return remote_sock
 
-    def _handle_dns_resolved(self, result, error):
+    def _handle_dns_resolved(self, result, error, need_proxy = False):
         if error:
             self._log_error(error)
             self.destroy()
@@ -771,7 +793,7 @@ class TCPRelayHandler(object):
                     else:
                         # else do connect
                         remote_sock = self._create_remote_socket(remote_addr,
-                                                                 remote_port)
+                                                                 remote_port, need_proxy)
                         if self._remote_udp:
                             self._loop.add(remote_sock,
                                            eventloop.POLL_IN,
