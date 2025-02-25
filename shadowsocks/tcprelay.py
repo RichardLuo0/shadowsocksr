@@ -98,15 +98,6 @@ TCP_MSS = NETWORK_MTU - 40
 BUF_SIZE = 32 * 1024
 UDP_MAX_BUF_SIZE = 65536
 
-# PROXY_WEBSITE = ["netflix.com", "openai.com", "cloudflare.com"]
-PROXY_WEBSITE = [
-  # TVB
-  "tvb.com", "tvbanywhere.com", "tvbanywhere.com.sg", "omtrdc.net",
-  # Tubi TV
-  "tubitv.com", "tubi.io",
-  # pdf-xchange
-  "pdf-xchange.com",
-]
 # socks.set_default_proxy(socks.SOCKS5, "127.0.0.1", 40000) # warp
 
 class SpeedTester(object):
@@ -682,7 +673,7 @@ class TCPRelayHandler(object):
                     self._data_to_write_to_remote.append(data[header_length:])
                 # notice here may go into _handle_dns_resolved directly
                 addr_len = len(remote_addr)
-                need_proxy = any(remote_addr.endswith(s) and (addr_len <= len(s) or remote_addr[-len(s) - 1] == ".") for s in PROXY_WEBSITE)
+                need_proxy = any(remote_addr.endswith(s) and (addr_len <= len(s) or remote_addr[-len(s) - 1] == ".") for s in self._config['proxy_domain'])
                 self._dns_resolver.resolve(remote_addr,
                                            partial(self._handle_dns_resolved, need_proxy = need_proxy),
                                            not need_proxy)
