@@ -34,6 +34,7 @@ from shadowsocks.common import pre_parse_header, parse_header
 
 # import socks
 from functools import partial
+import re
 
 # we clear at most TIMEOUTS_CLEAN_SIZE timeouts each time
 TIMEOUTS_CLEAN_SIZE = 512
@@ -142,6 +143,7 @@ class TCPRelayHandler(object):
         self._remotev6_sock_fd = None
         self._remote_udp = False
         self._config = config
+        self._proxy_domain_regex = re.compile("(^|\.)(" + "|".join(config['proxy_domain']) + ")$")
         self._dns_resolver = dns_resolver
         self._add_ref = 0
         if not self._create_encryptor(config):
@@ -672,8 +674,7 @@ class TCPRelayHandler(object):
                 if len(data) > header_length:
                     self._data_to_write_to_remote.append(data[header_length:])
                 # notice here may go into _handle_dns_resolved directly
-                addr_len = len(remote_addr)
-                need_proxy = any(remote_addr.endswith(s) and (addr_len <= len(s) or remote_addr[-len(s) - 1] == ".") for s in self._config['proxy_domain'])
+                need_proxy = bool(self._proxy_domain_regex.match(remote_addr))
                 self._dns_resolver.resolve(remote_addr,
                                            partial(self._handle_dns_resolved, need_proxy = need_proxy),
                                            not need_proxy)
