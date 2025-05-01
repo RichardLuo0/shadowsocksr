@@ -143,7 +143,7 @@ class TCPRelayHandler(object):
         self._remotev6_sock_fd = None
         self._remote_udp = False
         self._config = config
-        self._proxy_domain_regex = re.compile("(^|\.)(" + "|".join(config['proxy_domain']) + ")$")
+        self._proxy_domain_regex = { k: re.compile("(^|\.)(" + "|".join([s.replace(".", "\\.") for s in v]) + ")$") for k, v in config['proxy_domain'].items() } 
         self._dns_resolver = dns_resolver
         self._add_ref = 0
         if not self._create_encryptor(config):
@@ -674,10 +674,10 @@ class TCPRelayHandler(object):
                 if len(data) > header_length:
                     self._data_to_write_to_remote.append(data[header_length:])
                 # notice here may go into _handle_dns_resolved directly
-                need_proxy = bool(self._proxy_domain_regex.match(remote_addr))
+                proxy_interface = next((k for k, v in self._proxy_domain_regex.items() if bool(v.match(remote_addr))), None) 
                 self._dns_resolver.resolve(remote_addr,
-                                           partial(self._handle_dns_resolved, need_proxy = need_proxy),
-                                           not need_proxy)
+                                           partial(self._handle_dns_resolved, proxy_interface = proxy_interface),
+                                           not proxy_interface)
         except Exception as e:
             self._log_error(e)
             if self._config['verbose']:
@@ -705,7 +705,7 @@ class TCPRelayHandler(object):
                 except Exception as e:
                     logging.warn("bind %s fail" % (bind_addr,))
 
-    def _create_remote_socket(self, ip, port, need_proxy = False):
+    def _create_remote_socket(self, ip, port, proxy_interface = None):
         if self._remote_udp:
             addrs_v6 = socket.getaddrinfo("::", 0, 0, socket.SOCK_DGRAM, socket.SOL_UDP)
             addrs = socket.getaddrinfo("0.0.0.0", 0, 0, socket.SOCK_DGRAM, socket.SOL_UDP)
@@ -728,8 +728,8 @@ class TCPRelayHandler(object):
                         raise Exception('Port %d is in forbidden list, when connect to %s:%d via port %d by UID %d' %
                             (sa[1], self._remote_address[0], self._remote_address[1], self._server._listen_port, self._user_id))
                     raise Exception('Port %d is in forbidden list, reject' % sa[1])
-        af = socket.AF_INET if need_proxy else af
-        # remote_sock = socks.socksocket(af, socktype, proto) if need_proxy else socket.socket(af, socktype, proto)
+        af = socket.AF_INET if proxy_interface else af
+        # remote_sock = socks.socksocket(af, socktype, proto) if proxy_interface else socket.socket(af, socktype, proto)
         remote_sock = socket.socket(af, socktype, proto)
         self._remote_sock = remote_sock
         self._remote_sock_fd = remote_sock.fileno()
@@ -752,13 +752,13 @@ class TCPRelayHandler(object):
         else:
             remote_sock.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
             if not self._is_local:
-                if need_proxy:
-                  remote_sock.setsockopt(socket.SOL_SOCKET, 25, "tun0")
+                if proxy_interface:
+                  remote_sock.setsockopt(socket.SOL_SOCKET, 25, proxy_interface)
                 else:
                   self._socket_bind_addr(remote_sock, af)
         return remote_sock
 
-    def _handle_dns_resolved(self, result, error, need_proxy = False):
+    def _handle_dns_resolved(self, result, error, proxy_interface = None):
         if error:
             self._log_error(error)
             self.destroy()
@@ -784,8 +784,7 @@ class TCPRelayHandler(object):
                         # TODO when there is already data in this packet
                     else:
                         # else do connect
-                        remote_sock = self._create_remote_socket(remote_addr,
-                                                                 remote_port, need_proxy)
+                        remote_sock = self._create_remote_socket(remote_addr, remote_port, proxy_interface)
                         if self._remote_udp:
                             self._loop.add(remote_sock,
                                            eventloop.POLL_IN,
