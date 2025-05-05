@@ -143,7 +143,7 @@ class TCPRelayHandler(object):
         self._remotev6_sock_fd = None
         self._remote_udp = False
         self._config = config
-        self._proxy_domain_regex = { k: re.compile("(^|\.)(" + "|".join([s.replace(".", "\\.") for s in v]) + ")$") for k, v in config['proxy_domain'].items() } 
+        self._proxy_domain_regex = { k: re.compile("(^|\.)(" + "|".join(v) + ")$") for k, v in config['proxy_domain'].items() } 
         self._dns_resolver = dns_resolver
         self._add_ref = 0
         if not self._create_encryptor(config):

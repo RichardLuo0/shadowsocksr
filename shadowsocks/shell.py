@@ -19,7 +19,7 @@ from __future__ import absolute_import, division, print_function, \
     with_statement
 
 import os
-import json
+import json5
 import sys
 import getopt
 import logging
@@ -165,7 +165,7 @@ def get_config(is_local):
             logging.debug('loading config from %s' % config_path)
             with open(config_path, 'rb') as f:
                 try:
-                    config = parse_json_in_str(remove_comment(f.read().decode('utf8')))
+                    config = parse_json_in_str(f.read().decode('utf8'))
                 except ValueError as e:
                     logging.error('found an error in config.json: %s', str(e))
                     sys.exit(1)
@@ -398,48 +398,48 @@ def _decode_dict(data):
         rv[key] = value
     return rv
 
-class JSFormat:
-    def __init__(self):
-        self.state = 0
+# class JSFormat:
+#     def __init__(self):
+#         self.state = 0
 
-    def push(self, ch):
-        ch = ord(ch)
-        if self.state == 0:
-            if ch == ord('"'):
-                self.state = 1
-                return to_str(chr(ch))
-            elif ch == ord('/'):
-                self.state = 3
-            else:
-                return to_str(chr(ch))
-        elif self.state == 1:
-            if ch == ord('"'):
-                self.state = 0
-                return to_str(chr(ch))
-            elif ch == ord('\\'):
-                self.state = 2
-            return to_str(chr(ch))
-        elif self.state == 2:
-            self.state = 1
-            if ch == ord('"'):
-                return to_str(chr(ch))
-            return "\\" + to_str(chr(ch))
-        elif self.state == 3:
-            if ch == ord('/'):
-                self.state = 4
-            else:
-                return "/" + to_str(chr(ch))
-        elif self.state == 4:
-            if ch == ord('\n'):
-                self.state = 0
-                return "\n"
-        return ""
+#     def push(self, ch):
+#         ch = ord(ch)
+#         if self.state == 0:
+#             if ch == ord('"'):
+#                 self.state = 1
+#                 return to_str(chr(ch))
+#             elif ch == ord('/'):
+#                 self.state = 3
+#             else:
+#                 return to_str(chr(ch))
+#         elif self.state == 1:
+#             if ch == ord('"'):
+#                 self.state = 0
+#                 return to_str(chr(ch))
+#             elif ch == ord('\\'):
+#                 self.state = 2
+#             return to_str(chr(ch))
+#         elif self.state == 2:
+#             self.state = 1
+#             if ch == ord('"'):
+#                 return to_str(chr(ch))
+#             return "\\" + to_str(chr(ch))
+#         elif self.state == 3:
+#             if ch == ord('/'):
+#                 self.state = 4
+#             else:
+#                 return "/" + to_str(chr(ch))
+#         elif self.state == 4:
+#             if ch == ord('\n'):
+#                 self.state = 0
+#                 return "\n"
+#         return ""
 
-def remove_comment(json):
-    fmt = JSFormat()
-    return "".join([fmt.push(c) for c in json])
+# def remove_comment(json):
+#     fmt = JSFormat()
+#     return "".join([fmt.push(c) for c in json])
 
 
 def parse_json_in_str(data):
     # parse json and convert everything from unicode to str
-    return json.loads(data, object_hook=_decode_dict)
+    return json5.loads(data, object_hook=_decode_dict)
