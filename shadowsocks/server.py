@@ -22,6 +22,7 @@ import sys
 import os
 import logging
 import signal
+import re
 
 if __name__ == '__main__':
     import inspect
@@ -46,6 +47,9 @@ def main():
         logging.info('current process RLIMIT_NOFILE resource: soft %d hard %d'  % resource.getrlimit(resource.RLIMIT_NOFILE))
     except ImportError:
         pass
+
+    if 'proxy_domain' in config:
+        proxy_domain_regex = { k: re.compile("(^|.*\.)(" + "|".join(v) + ")$") for k, v in config['proxy_domain'].items() }
 
     if config['port_password']:
         pass
@@ -101,6 +105,7 @@ def main():
         else:
             password = password_obfs
         a_config = config.copy()
+        a_config['proxy_domain_regex'] = proxy_domain_regex
         ipv6_ok = False
         logging.info("server start with protocol[%s] password [%s] method [%s] obfs [%s] obfs_param [%s]" %
                 (protocol, password, method, obfs, obfs_param))
@@ -129,6 +134,7 @@ def main():
 
         try:
             a_config = config.copy()
+            a_config['proxy_domain_regex'] = proxy_domain_regex
             a_config['server_port'] = int(port)
             a_config['password'] = password
             a_config['method'] = method

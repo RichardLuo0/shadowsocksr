@@ -349,14 +349,14 @@ class UDPAsyncDNSHandler(object):
         self.remote_addr = None
         self.call_back = None
 
-    def resolve(self, dns_resolver, remote_addr, call_back):
+    def resolve(self, dns_resolver, remote_addr, call_back, support_ipv6 = True):
         if remote_addr in UDPAsyncDNSHandler.dns_cache:
             if call_back:
                 call_back("", remote_addr, UDPAsyncDNSHandler.dns_cache[remote_addr], self.params)
         else:
             self.call_back = call_back
             self.remote_addr = remote_addr
-            dns_resolver.resolve(remote_addr[0], self._handle_dns_resolved)
+            dns_resolver.resolve(remote_addr[0], self._handle_dns_resolved, support_ipv6)
             UDPAsyncDNSHandler.dns_cache.sweep()
 
     def _handle_dns_resolved(self, result, error):

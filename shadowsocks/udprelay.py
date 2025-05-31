@@ -386,14 +386,19 @@ class UDPRelay(object):
         if (addrtype & 7) == 3:
             af = common.is_ip(server_addr)
             if af == False:
+                if self._config['proxy_domain_regex'] is not None:
+                    proxy_interface = next((k for k, v in self._config['proxy_domain_regex'].items() if bool(v.match(server_addr))), None)
+                # logging.info(server_addr + ": " + str(proxy_interface))
                 handler = common.UDPAsyncDNSHandler((data, r_addr, uid, header_length))
-                handler.resolve(self._dns_resolver, (server_addr, server_port), self._handle_server_dns_resolved)
+                handler.resolve(self._dns_resolver, (server_addr, server_port),
+                                partial(self._handle_server_dns_resolved, proxy_interface = proxy_interface),
+                                not proxy_interface)
             else:
                 self._handle_server_dns_resolved("", (server_addr, server_port), server_addr, (data, r_addr, uid, header_length))
         else:
             self._handle_server_dns_resolved("", (server_addr, server_port), server_addr, (data, r_addr, uid, header_length))
 
-    def _handle_server_dns_resolved(self, error, remote_addr, server_addr, params):
+    def _handle_server_dns_resolved(self, error, remote_addr, server_addr, params, proxy_interface = None):
         if error:
             return
         data, r_addr, uid, header_length = params
@@ -424,7 +429,10 @@ class UDPRelay(object):
                 client = socket.socket(af, socktype, proto)
                 client_uid = uid
                 client.setblocking(False)
-                self._socket_bind_addr(client, af)
+                if proxy_interface:
+                    client.setsockopt(socket.SOL_SOCKET, 25, proxy_interface)
+                else:
+                    self._socket_bind_addr(client, af)
                 is_dns = False
                 if len(data) > header_length + 13 and data[header_length + 4 : header_length + 12] == b"\x00\x01\x00\x00\x00\x00\x00\x00":
                     is_dns = True

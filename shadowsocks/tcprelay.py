@@ -34,7 +34,6 @@ from shadowsocks.common import pre_parse_header, parse_header
 
 # import socks
 from functools import partial
-import re
 
 # we clear at most TIMEOUTS_CLEAN_SIZE timeouts each time
 TIMEOUTS_CLEAN_SIZE = 512
@@ -143,7 +142,6 @@ class TCPRelayHandler(object):
         self._remotev6_sock_fd = None
         self._remote_udp = False
         self._config = config
-        self._proxy_domain_regex = { k: re.compile("(^|.*\.)(" + "|".join(v) + ")$") for k, v in config['proxy_domain'].items() } 
         self._dns_resolver = dns_resolver
         self._add_ref = 0
         if not self._create_encryptor(config):
@@ -674,7 +672,9 @@ class TCPRelayHandler(object):
                 if len(data) > header_length:
                     self._data_to_write_to_remote.append(data[header_length:])
                 # notice here may go into _handle_dns_resolved directly
-                proxy_interface = next((k for k, v in self._proxy_domain_regex.items() if bool(v.match(remote_addr))), None) 
+                if self._config['proxy_domain_regex'] is not None:
+                    proxy_interface = next((k for k, v in self._config['proxy_domain_regex'].items() if bool(v.match(remote_addr))), None) 
+                # logging.info(remote_addr + ": " + str(proxy_interface))
                 self._dns_resolver.resolve(remote_addr,
                                            partial(self._handle_dns_resolved, proxy_interface = proxy_interface),
                                            not proxy_interface)
@@ -728,7 +728,6 @@ class TCPRelayHandler(object):
                         raise Exception('Port %d is in forbidden list, when connect to %s:%d via port %d by UID %d' %
                             (sa[1], self._remote_address[0], self._remote_address[1], self._server._listen_port, self._user_id))
                     raise Exception('Port %d is in forbidden list, reject' % sa[1])
-        af = socket.AF_INET if proxy_interface else af
         # remote_sock = socks.socksocket(af, socktype, proto) if proxy_interface else socket.socket(af, socktype, proto)
         remote_sock = socket.socket(af, socktype, proto)
         self._remote_sock = remote_sock
