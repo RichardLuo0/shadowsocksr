@@ -385,19 +385,6 @@ def _decode_list(data):
         rv.append(item)
     return rv
 
-
-def _decode_dict(data):
-    rv = {}
-    for key, value in data.items():
-        if hasattr(value, 'encode'):
-            value = value.encode('utf-8')
-        elif isinstance(value, list):
-            value = _decode_list(value)
-        elif isinstance(value, dict):
-            value = _decode_dict(value)
-        rv[key] = value
-    return rv
-
 # class JSFormat:
 #     def __init__(self):
 #         self.state = 0
@@ -442,4 +429,4 @@ def _decode_dict(data):
 
 def parse_json_in_str(data):
     # parse json and convert everything from unicode to str
-    return json5.loads(data, object_hook=_decode_dict)
+    return json5.loads(data)

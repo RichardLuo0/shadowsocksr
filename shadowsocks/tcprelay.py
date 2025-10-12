@@ -673,7 +673,9 @@ class TCPRelayHandler(object):
                     self._data_to_write_to_remote.append(data[header_length:])
                 # notice here may go into _handle_dns_resolved directly
                 if self._config['proxy_domain_regex'] is not None:
-                    proxy_interface = next((k for k, v in self._config['proxy_domain_regex'].items() if bool(v.match(remote_addr))), None) 
+                    remote_addr_str = remote_addr.decode('utf-8')
+                    proxy_interface = next((k for k, v in self._config['proxy_domain_regex'].items() if v.match(remote_addr_str)), None)
+                    proxy_interface = proxy_interface and proxy_interface.encode('utf-8')
                 # logging.info(remote_addr + ": " + str(proxy_interface))
                 self._dns_resolver.resolve(remote_addr,
                                            partial(self._handle_dns_resolved, proxy_interface = proxy_interface),
